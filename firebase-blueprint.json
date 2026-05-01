@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "UserSession": {
+      "title": "UserSession",
+      "description": "An active authenticated session with associated security metadata.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The unique ID of the authorized user." },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "source": { "type": "string", "description": "User agent or device info." },
+        "ip": { "type": "string" },
+        "trustScore": { "type": "number", "description": "Calculation from ZeroGate neural engine." },
+        "status": { "type": "string", "enum": ["ACTIVE", "REVOKED", "STEP_UP_PENDING"] },
+        "lastSeen": { "type": "string", "format": "date-time" },
+        "riskLevel": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+        "dPopBound": { "type": "boolean", "description": "Whether the token is hardware bound." }
+      },
+      "required": ["userId", "email", "status", "trustScore", "lastSeen"]
+    },
+    "TelemetryPoint": {
+      "title": "TelemetryPoint",
+      "description": "Aggregated traffic telemetry.",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "requests": { "type": "number" },
+        "avgLatency": { "type": "number" },
+        "riskEvents": { "type": "number" }
+      },
+      "required": ["timestamp", "requests"]
+    }
+  },
+  "firestore": {
+    "/sessions/{sessionId}": {
+      "schema": "UserSession",
+      "description": "Active identity sessions."
+    },
+    "/telemetry/{pointId}": {
+      "schema": "TelemetryPoint",
+      "description": "Traffic throughput metrics."
+    }
+  }
+}

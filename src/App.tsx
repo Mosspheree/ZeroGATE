@@ -27,7 +27,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
-import { useSimulation } from './useSimulation';
+import { useZeroGate } from './useZeroGate';
+import { loginWithGoogle } from './lib/firebase';
 import { DIFFERENTIATORS, SLOS, ROADMAP } from './constants';
 
 enum View {
@@ -108,17 +109,32 @@ const SectionHeading = ({ number, title, subtitle }: { number: string, title: st
 const AppSimulation = () => {
   const [authState, setAuthState] = useState<'IDLE' | 'CHALLENGE' | 'SUCCESS' | 'DENIED'>('IDLE');
   const [persona, setPersona] = useState<'CORPORATE' | 'ATTACKER'>('CORPORATE');
+  const { createSession, currentUser } = useZeroGate();
   
-  const handleLogin = () => {
-    setAuthState('CHALLENGE');
-    setTimeout(() => {
-      if (persona === 'ATTACKER') {
-        setAuthState('DENIED');
-      } else {
-        setAuthState('SUCCESS');
+  const handleLogin = async () => {
+    try {
+      if (!currentUser) {
+        await loginWithGoogle();
       }
-    }, 2000);
+      
+      setAuthState('CHALLENGE');
+      
+      // Artificial delay for the "Evaluation" visual
+      setTimeout(async () => {
+        if (persona === 'ATTACKER') {
+          setAuthState('DENIED');
+        } else {
+          await createSession();
+          setAuthState('SUCCESS');
+        }
+      }, 2500);
+    } catch (error) {
+      console.error("Auth flow failed:", error);
+      setAuthState('IDLE');
+    }
   };
+
+  const currentDisplayName = currentUser?.displayName || (persona === 'CORPORATE' ? 'Alex Rivera' : 'Unknown Entity');
 
   return (
     <div className="max-w-4xl mx-auto py-20 px-8 flex flex-col items-center">
@@ -167,7 +183,7 @@ const AppSimulation = () => {
                 </div>
                 <h2 className="text-4xl font-light text-white tracking-tight uppercase">Secure <span className="font-black italic text-brand-indigo">Assets</span></h2>
                 <p className="text-slate-400 max-w-sm font-light leading-relaxed">
-                  Authentication request from <span className="text-white font-bold">{persona === 'CORPORATE' ? 'Alex Rivera (Verified Device)' : 'Unknown Entity (T800-Series)'}</span>.
+                  Authentication request from <span className="text-white font-bold">{currentDisplayName} {persona === 'CORPORATE' ? '(Verified Device)' : '(T800-Series)'}</span>.
                 </p>
                 <button 
                   onClick={handleLogin}
@@ -218,7 +234,7 @@ const AppSimulation = () => {
                      </div>
                      <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-500">Identity Secure</p>
-                        <p className="text-white font-bold text-lg">Alex Rivera</p>
+                        <p className="text-white font-bold text-lg">{currentUser?.displayName || 'Alex Rivera'}</p>
                      </div>
                    </div>
                    <div className="text-right">
@@ -281,7 +297,7 @@ const AppSimulation = () => {
 
 export default function App() {
   const [view, setView] = useState<View>(View.LANDING);
-  const { sessions, telemetry, revokeSession } = useSimulation();
+  const { sessions, telemetry, revokeSession } = useZeroGate();
 
   return (
     <div className="min-h-screen bg-[#020617] text-gray-100 selection:bg-brand-indigo selection:text-white selection:bg-opacity-30">

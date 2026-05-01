@@ -12,6 +12,7 @@ export enum RiskLevel {
 
 export interface Session {
   id: string;
+  userId: string;
   user: string;
   email: string;
   source: string;

@@ -8,28 +8,35 @@
 
 ---
 
-## 🎮 Interactive Features
+## 🚀 Production-Grade Features
 
-This repository contains a production-grade frontend implementation of the ZeroGate platform, featuring:
+ZeroGate has evolved from a simulation to a functional prototype:
 
-### 1. Control Plane (Admin Dashboard)
-A high-density security operations center (SOC) view featuring:
-- **Live Telemetry Stream:** Real-time throughput and request monitoring using `recharts`.
-- **Global Topology Map:** SVG-based network visualization showing node health and traffic patterns across global regions.
-- **Neural Trust Index:** A simulated risk engine that calculates session trust scores based on anomaly detection.
-- **Session Fabric:** Interactive management of active identity sessions with one-click revocation.
+### 1. Real Auth Flow (Firebase Integration)
+- **OIDC Identity Provider:** Powered by Firebase Authentication.
+- **Biometric Handshake:** Authenticated users trigger a cryptographic session binding process.
+- **Session Persistence:** Active sessions are stored securely in Firestore with real-time sync.
 
-### 2. Adaptive Trust Simulation (Live Demo)
-A functional demonstration of the "End-User" experience:
-- **Persona Toggling:** Ability to switch between a *Verified Corporate Subject* and an *Unknown Threat*.
-- **Cryptographic Binding:** Visual demonstration of DPoP (RFC 9449) token issuance and device-level attestation.
-- **Real-Time Rejection:** Witness the Neural Gateway instantly revoke access when the risk engine detects attacker-like fingerprints.
+### 2. Neural Risk Engine (Express API)
+- **Heuristic Scoring:** A backend API (`/api/risk/evaluate`) analyzes request headers, IP reputation, and behavioral context.
+- **Dynamic Policy Rejection:** The "Attacker" persona is now caught by a server-side rule engine, not just a frontend toggle.
 
-### 3. Technical Deep Dive
-An on-page architectural overview including:
-- **Protocol Insights:** Breakdown of short-lived Proof-of-Possession (PoP) tokens.
-- **Performance Benchmarks:** Documented latency targets for token introspection and policy evaluation.
-- **Code Schema:** Interactive code blocks showing internal DPoP proof structures.
+### 3. Session Fabric (Firestore)
+- **Live State Management:** The SOC dashboard reflects real data from the Firestore database.
+- **Unified Revocation:** One-click revocation update propagates through the persistence layer instantly.
+
+### 4. ZeroGate SDK (`zerogate-js`)
+- **Developer First:** A consolidated client-side SDK (`src/services/zerogate.ts`) encapsulates complex auth and risk logic.
+- **Zero-Config Telemetry:** Automatic collection of performance and security metrics.
+
+---
+
+## 🏗️ Architecture
+
+- **Frontend:** React 19 / Vite / Tailwind 4
+- **Backend:** Node.js Express (on `tsx`)
+- **Database:** Google Cloud Firestore
+- **Auth:** Firebase Identity Platform
 
 ---
 
