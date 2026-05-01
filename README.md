@@ -67,6 +67,47 @@ ZeroGate is decomposed into five independently deployable planes:
 | System Availability | 99.99% | Active-active across 3 Availability Zones |
 | Sustained Throughput | 100k TPS | Horizontally scalable architecture |
 
+## 🏗️ Project Structure
+
+The project follows a **Security Plane Separation** architecture (ADR-002), physically decoupling identity management from backend risk evaluation.
+
+```bash
+ZeroGate/
+├── client/           # Identity Portal & SOC Dashboard (React 19)
+│   ├── src/          # Frontend logic and components
+│   └── index.html    # Client entry point
+├── server/           # Risk Engine & BFF (Node.js Express)
+│   └── server.ts     # API logic and middleware
+├── docs/             # Architecture Decision Records (ADRs)
+│   ├── ADR-001-why-firebase.md
+│   ├── ADR-002-repo-restructure.md
+│   └── ADR-003-design-philosophy.md
+├── firebase-applet-config.json # App configuration (GITIGNORE'D)
+├── firestore.rules   # Hardened security rules
+└── package.json      # Workspace orchestration
+```
+
+---
+
+## 📜 Architecture Decision Records (ADRs)
+
+We document major architectural shifts to maintain transparency and "Senior-level" decision tracking.
+
+- **[ADR-001: Selection of Firebase for Identity](./docs/ADR-001-why-firebase.md)** - Why we chose Firebase over custom OIDC for the prototype phase.
+- **[ADR-002: Monorepo Plane Separation](./docs/ADR-002-repo-restructure.md)** - The rationale behind the physical directory split between client and server.
+- **[ADR-003: Design Philosophy](./docs/ADR-003-design-philosophy.md)** - Establishing the "Deep Technical" visual language of the platform.
+
+---
+
+## 🛡️ Security Posture
+
+- **Hardened Rules:** Firestore security rules enforce `request.auth.uid` level isolation.
+- **Credential Safety:** `firebase-applet-config.json` is strictly added to `.gitignore` to prevent secret leakage.
+- **Server-Side Risk:** Risk scoring is performed on the server (`/api/risk/evaluate`) to prevent client-side evaluation tampering.
+- **JWT Binding:** Demonstrated usage of DPoP (Demonstrating Proof-of-Possession) concepts within the authenticated session management.
+
+---
+
 ## 🛠️ Development Setup
 
 Built with a specialized high-performance frontend stack:
