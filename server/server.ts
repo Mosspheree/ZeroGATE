@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 let db: FirebaseFirestore.Firestore;
 
 try {
-  const configPath = path.join(__dirname, "firebase-applet-config.json");
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
   const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
   
   initializeApp({

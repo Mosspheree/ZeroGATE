@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# ZeroGate Security
+firebase-applet-config.json
+firebase-blueprint.json
+DRAFT_firestore.rules
+security_spec.md
