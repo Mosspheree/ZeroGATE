@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Shield, 
@@ -18,7 +18,13 @@ import {
   Menu,
   X,
   User,
-  Fingerprint
+  Fingerprint,
+  Code2,
+  Terminal,
+  Cpu,
+  Zap,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { useSimulation } from './useSimulation';
@@ -30,7 +36,30 @@ enum View {
   APP_DEMO = 'APP_DEMO'
 }
 
-// --- Sub-components (Existing) ---
+// --- Sub-components ---
+
+const CodeBlock = ({ code, language }: { code: string, language: string }) => (
+  <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden group">
+    <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-900/50">
+      <div className="flex gap-1.5">
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-800" />
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-800" />
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-800" />
+      </div>
+      <span className="text-[10px] font-mono text-slate-500 uppercase">{language}</span>
+    </div>
+    <pre className="p-6 text-[11px] font-mono leading-relaxed overflow-x-auto">
+      <code className="text-slate-300">
+        {code.split('\n').map((line, i) => (
+          <div key={i} className="table-row">
+            <span className="table-cell pr-6 text-slate-700 select-none text-right">{i + 1}</span>
+            <span className="table-cell">{line}</span>
+          </div>
+        ))}
+      </code>
+    </pre>
+  </div>
+);
 
 const Nav = ({ activeView, setView }: { activeView: View, setView: (v: View) => void }) => (
   <nav className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-8 py-6 glass bg-[#020617]/80 border-b border-slate-800">
@@ -46,7 +75,7 @@ const Nav = ({ activeView, setView }: { activeView: View, setView: (v: View) => 
     <div className="hidden md:flex items-center gap-10 text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500">
       <button onClick={() => setView(View.LANDING)} className={`hover:text-white transition-colors ${activeView === View.LANDING ? 'text-white' : ''}`}>Overview</button>
       <button onClick={() => setView(View.DASHBOARD)} className={`hover:text-white transition-colors flex items-center gap-2 ${activeView === View.DASHBOARD ? 'text-white' : ''}`}>
-        <LayoutDashboard size={12} /> Dashboard
+        <LayoutDashboard size={12} /> Control Plane
       </button>
       <button onClick={() => setView(View.APP_DEMO)} className={`hover:text-white transition-colors flex items-center gap-2 ${activeView === View.APP_DEMO ? 'text-white' : ''}`}>
         <Monitor size={12} /> Live Demo
@@ -77,16 +106,39 @@ const SectionHeading = ({ number, title, subtitle }: { number: string, title: st
 // --- App Simulation (The "Customer App" View) ---
 
 const AppSimulation = () => {
-  const [authState, setAuthState] = useState<'IDLE' | 'CHALLENGE' | 'SUCCESS'>('IDLE');
+  const [authState, setAuthState] = useState<'IDLE' | 'CHALLENGE' | 'SUCCESS' | 'DENIED'>('IDLE');
+  const [persona, setPersona] = useState<'CORPORATE' | 'ATTACKER'>('CORPORATE');
   
   const handleLogin = () => {
     setAuthState('CHALLENGE');
-    setTimeout(() => setAuthState('SUCCESS'), 2500);
+    setTimeout(() => {
+      if (persona === 'ATTACKER') {
+        setAuthState('DENIED');
+      } else {
+        setAuthState('SUCCESS');
+      }
+    }, 2000);
   };
 
   return (
     <div className="max-w-4xl mx-auto py-20 px-8 flex flex-col items-center">
-      <div className="w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+      {/* Persona Toggle */}
+      <div className="mb-12 flex bg-slate-900 p-1 rounded-2xl border border-slate-800">
+         <button 
+           onClick={() => setPersona('CORPORATE')}
+           className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${persona === 'CORPORATE' ? 'bg-brand-indigo text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+         >
+           Corporate Subject
+         </button>
+         <button 
+           onClick={() => setPersona('ATTACKER')}
+           className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${persona === 'ATTACKER' ? 'bg-brand-rose text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+         >
+           Unknown Threat
+         </button>
+      </div>
+
+      <div className="w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl relative">
         <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950">
            <div className="flex gap-1.5">
              <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/30" />
@@ -94,12 +146,12 @@ const AppSimulation = () => {
              <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/30" />
            </div>
            <div className="px-4 py-1.5 bg-slate-900 rounded-lg text-[10px] font-mono text-slate-500 border border-slate-800">
-             https://finance-portal.secure-nexus.io
+             https://vault.zerogate.security
            </div>
            <div className="w-12" />
         </div>
         
-        <div className="p-16 flex flex-col items-center text-center">
+        <div className="p-16 flex flex-col items-center text-center min-h-[400px] justify-center">
           <AnimatePresence mode="wait">
             {authState === 'IDLE' && (
               <motion.div 
@@ -109,16 +161,19 @@ const AppSimulation = () => {
                 exit={{ opacity: 0, scale: 1.05 }}
                 className="space-y-8"
               >
-                <div className="w-20 h-20 rounded-3xl bg-brand-indigo/10 flex items-center justify-center text-brand-indigo mx-auto mb-8">
-                  <Shield size={40} />
+                <div className="w-20 h-20 rounded-3xl bg-brand-indigo/10 flex items-center justify-center text-brand-indigo mx-auto mb-8 relative">
+                   <Shield size={40} />
+                   <div className="absolute -inset-4 bg-brand-indigo/10 blur-2xl rounded-full animate-pulse" />
                 </div>
-                <h2 className="text-4xl font-light text-white tracking-tight uppercase">Corporate <span className="font-black">Wealth</span></h2>
-                <p className="text-slate-400 max-w-sm font-light">Access your secure institutional portfolio. Authentication managed by your global ZeroGate proxy.</p>
+                <h2 className="text-4xl font-light text-white tracking-tight uppercase">Secure <span className="font-black italic text-brand-indigo">Assets</span></h2>
+                <p className="text-slate-400 max-w-sm font-light leading-relaxed">
+                  Authentication request from <span className="text-white font-bold">{persona === 'CORPORATE' ? 'Alex Rivera (Verified Device)' : 'Unknown Entity (T800-Series)'}</span>.
+                </p>
                 <button 
                   onClick={handleLogin}
-                  className="w-full py-5 bg-brand-indigo text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-3 hover:shadow-[0_0_40px_rgba(99,102,241,0.5)] transition-all"
+                  className={`w-full py-5 ${persona === 'CORPORATE' ? 'bg-brand-indigo' : 'bg-brand-rose'} text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-3 hover:shadow-2xl transition-all active:scale-95`}
                 >
-                  Enter with ZeroGate
+                  Initiate Secure Flow
                 </button>
               </motion.div>
             )}
@@ -129,7 +184,7 @@ const AppSimulation = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-8"
+                className="space-y-10"
               >
                 <div className="relative">
                   <div className="w-24 h-24 rounded-full border-2 border-brand-indigo/20 flex items-center justify-center mx-auto">
@@ -137,11 +192,14 @@ const AppSimulation = () => {
                   </div>
                   <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-brand-indigo border-t-transparent animate-spin mx-auto" />
                 </div>
-                <h3 className="text-xl font-bold text-white uppercase tracking-widest">Verifying Identity</h3>
-                <div className="text-slate-500 font-mono text-[10px] space-y-1">
-                   <p className="animate-pulse">Checking device attestation...</p>
-                   <p className="opacity-0 [animation:fadeIn_0.5s_0.8s_forwards]">Validating FIDO2 passkey...</p>
-                   <p className="opacity-0 [animation:fadeIn_0.5s_1.2s_forwards]">Evaluating telemetry context...</p>
+                <div className="space-y-2">
+                   <h3 className="text-xl font-bold text-white uppercase tracking-widest">Evaluating Context</h3>
+                   <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest italic">Node: SFO-CENTRAL-01</p>
+                </div>
+                <div className="text-slate-500 font-mono text-[10px] space-y-1.5 bg-black/20 p-4 rounded-xl border border-white/5">
+                   <p className="flex items-center gap-2"><CheckCircle2 size={10} className="text-green-500" /> Device ID: 0x882A-FF</p>
+                   <p className="flex items-center gap-2"><CheckCircle2 size={10} className="text-green-500" /> Bio-Signature: MATCH</p>
+                   <p className="flex items-center gap-2 animate-pulse"><Activity size={10} className="text-brand-indigo" /> Calibrating Trust Delta...</p>
                 </div>
               </motion.div>
             )}
@@ -154,24 +212,27 @@ const AppSimulation = () => {
                 className="space-y-8 w-full"
               >
                 <div className="flex items-center justify-between p-6 bg-green-500/10 border border-green-500/20 rounded-2xl">
-                   <div className="flex items-center gap-4">
-                     <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
-                        <User size={20} />
+                   <div className="flex items-center gap-4 text-left">
+                     <div className="w-12 h-12 rounded-2xl bg-green-500/20 flex items-center justify-center text-green-500">
+                        <User size={24} />
                      </div>
-                     <div className="text-left">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-green-500">Identity Secure</p>
-                        <p className="text-white font-bold">Alex Rivera <span className="font-normal text-slate-500 italic ml-2">alex@mossphere.com</span></p>
+                     <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-500">Identity Secure</p>
+                        <p className="text-white font-bold text-lg">Alex Rivera</p>
                      </div>
                    </div>
                    <div className="text-right">
-                      <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Trust Index</p>
-                      <p className="text-brand-indigo font-mono font-bold">98.2%</p>
+                      <p className="text-[9px] font-black uppercase text-slate-500 tracking-widest">DPoP Guard</p>
+                      <p className="text-brand-indigo font-mono font-bold">ACTIVE</p>
                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-4">
                    {[1, 2, 3, 4].map(i => (
-                     <div key={i} className="h-32 bg-slate-800/20 border border-slate-700/50 rounded-2xl animate-pulse" />
+                     <div key={i} className="h-24 bg-slate-950/50 border border-slate-800 rounded-2xl p-4 flex flex-col justify-end text-left">
+                        <div className="w-8 h-1 bg-slate-800 rounded mb-2" />
+                        <div className="w-12 h-1 bg-slate-800 rounded" />
+                     </div>
                    ))}
                 </div>
 
@@ -179,18 +240,40 @@ const AppSimulation = () => {
                   onClick={() => setAuthState('IDLE')}
                   className="text-slate-500 text-[10px] uppercase font-black hover:text-white transition-colors tracking-widest"
                 >
-                  Revoke Session
+                  Terminate Secure Session
+                </button>
+              </motion.div>
+            )}
+
+            {authState === 'DENIED' && (
+              <motion.div 
+                key="denied"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="space-y-8 w-full"
+              >
+                <div className="w-24 h-24 rounded-3xl bg-brand-rose/10 flex items-center justify-center text-brand-rose mx-auto border border-brand-rose/20">
+                   <AlertTriangle size={48} />
+                </div>
+                <div className="space-y-2">
+                   <h3 className="text-3xl font-black text-brand-rose uppercase tracking-tighter italic">Access Revoked</h3>
+                   <p className="text-slate-400 font-light px-12">Session token rejected by Neural Gateway due to impossible travel delta.</p>
+                </div>
+                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 font-mono text-[10px] text-brand-rose text-left">
+                   <p>&gt; TRACE: ORIGIN_UNTRUSTED</p>
+                   <p>&gt; REASON: TOKEN_SPOOF_DETECTED</p>
+                   <p>&gt; ACTION: NODE_REJECTION_ISSUED</p>
+                </div>
+                <button 
+                  onClick={() => setAuthState('IDLE')}
+                  className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] hover:bg-slate-700 transition-all"
+                >
+                  Return to Gateway
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-      </div>
-      
-      <div className="mt-12 p-8 bg-brand-indigo/5 border border-brand-indigo/20 rounded-3xl max-w-2xl text-center">
-         <p className="text-slate-400 font-light italic">
-           "This simulation demonstrates the ZeroGate <span className="text-white font-bold">Proof-of-Possession</span> flow. Even if this session were captured, it would be unusable by an attacker because the token is hardware-bound to your device via DPoP."
-         </p>
       </div>
     </div>
   );
@@ -303,6 +386,107 @@ export default function App() {
                        <div>
                           <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Key Storage</p>
                           <p className="text-white font-mono">TPM/Enclave</p>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Technical Deep Dive */}
+              <section className="py-32 px-8 bg-slate-950/50 border-y border-slate-900 overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-40 opacity-5 pointer-events-none">
+                  <Code2 size={400} className="text-brand-indigo" />
+                </div>
+                <div className="max-w-6xl mx-auto">
+                  <SectionHeading number="02" title="Protocol Architecture" subtitle="Built on modern standards with custom hardening for next-gen threats." />
+                  
+                  <div className="grid lg:grid-cols-2 gap-16 items-start">
+                    <div className="space-y-12">
+                      <div className="space-y-6">
+                         <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-brand-indigo/10 flex items-center justify-center text-brand-indigo">
+                               <Cpu size={24} />
+                            </div>
+                            <h4 className="text-xl font-bold text-white tracking-tight">E2E Cryptographic Binding</h4>
+                         </div>
+                         <p className="text-slate-400 font-light leading-relaxed">
+                            ZeroGate doesn't just issue JWTs. It issues <span className="text-white font-medium">BndJWTs</span>. During the OIDC flow, the client generates an ephemeral asymmetric key pair. The private key never leaves the client's secure enclave (TPM/Secure Element).
+                         </p>
+                         <ul className="space-y-3">
+                            {['Zero-day session hijacking protection', 'No shared secrets over the wire', 'FIPS 140-2 Level 2 Compliance'].map((item, i) => (
+                              <li key={i} className="flex items-center gap-3 text-xs text-slate-500 uppercase font-black tracking-widest">
+                                 <CheckCircle2 size={14} className="text-brand-indigo" /> {item}
+                              </li>
+                            ))}
+                         </ul>
+                      </div>
+
+                      <div className="space-y-6">
+                         <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-brand-rose/10 flex items-center justify-center text-brand-rose">
+                               <Terminal size={24} />
+                            </div>
+                            <h4 className="text-xl font-bold text-white tracking-tight">DPoP Proof Example</h4>
+                         </div>
+                         <p className="text-slate-400 font-light font-mono text-xs italic">
+                            // Header segment of a ZeroGate DPoP Proof
+                         </p>
+                         <CodeBlock language="typescript" code={`{
+  "typ": "dpop+jwt",
+  "alg": "ES256",
+  "jwk": {
+    "kty": "EC",
+    "x": "l8t...U",
+    "y": "W2p...A",
+    "crv": "P-256"
+  }
+}
+// Bound to HTTP Request
+{
+  "jti": "882a...9b",
+  "htm": "POST",
+  "htu": "https://vault.zerogate.security/v1/transfer",
+  "iat": 1714605923
+}`} />
+                      </div>
+                    </div>
+
+                    <div className="sticky top-32">
+                       <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden">
+                          <div className="absolute -top-24 -right-24 w-64 h-64 bg-brand-indigo/10 blur-[100px] rounded-full" />
+                          <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-indigo mb-10 flex items-center gap-3">
+                             <Activity size={14} /> Latency Benchmark
+                          </h4>
+                          
+                          <div className="space-y-10">
+                             {[
+                               { label: "Token Introspection", val: "12ms", p: "85%" },
+                               { label: "Risk Score Inference", val: "4ms", p: "40%" },
+                               { label: "Policy Evaluation", val: "2ms", p: "25%" },
+                               { label: "Revocation Propagation", val: "150ms", p: "100%" }
+                             ].map((b, i) => (
+                               <div key={i} className="space-y-3">
+                                  <div className="flex justify-between items-end">
+                                     <span className="text-sm font-bold text-white tracking-tight">{b.label}</span>
+                                     <span className="text-xs font-mono text-brand-indigo">{b.val}</span>
+                                  </div>
+                                  <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+                                     <motion.div 
+                                       initial={{ width: 0 }}
+                                       whileInView={{ width: b.p }}
+                                       className="h-full bg-brand-indigo"
+                                       viewport={{ once: true }}
+                                     />
+                                  </div>
+                               </div>
+                             ))}
+                          </div>
+
+                          <div className="mt-12 p-6 bg-slate-950/50 rounded-2xl border border-slate-800">
+                             <p className="text-[10px] text-slate-500 font-mono leading-relaxed">
+                                Performance metrics collected using <span className="text-white">k6</span> across multi-region AWS clusters (us-east-1, eu-central-1, ap-southeast-1).
+                             </p>
+                          </div>
                        </div>
                     </div>
                   </div>
