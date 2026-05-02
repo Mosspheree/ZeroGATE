@@ -94,21 +94,8 @@ async function startServer() {
 
   // Telemetry Collector for Recharts
   app.get("/api/telemetry", async (req, res) => {
-    // In a real app, this would query a timeseries db or Firestore
-    // For now, we'll return some synthesized data or query last 40 points from Firestore if they exist
-    try {
-      if (db) {
-        const snapshot = await db.collection("telemetry").orderBy("timestamp", "desc").limit(40).get();
-        const data = snapshot.docs.map(doc => doc.data()).reverse();
-        if (data.length > 0) {
-          return res.json(data);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to fetch telemetry:", e);
-    }
-    
-    // Mock fallback if DB empty
+    // Client now fetches from Firestore directly to avoid permission issues
+    // Returning empty array as fallback for legacy calls
     res.json([]);
   });
 

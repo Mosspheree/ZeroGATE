@@ -11,6 +11,10 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
+    function isAnySignedIn() {
+      return request.auth != null;
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -63,7 +67,7 @@ service cloud.firestore {
 
     // Telemetry
     match /telemetry/{pointId} {
-      allow read: if isSignedIn();
+      allow read: if isAnySignedIn();
       allow create: if isAdmin(); // Only system can write telemetry
     }
   }
