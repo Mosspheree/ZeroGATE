@@ -4,12 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server/server.ts",
-    "start": "node server/server.ts",
     "build": "vite build",
-    "preview": "vite preview",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "dev": "tsx server/server.ts",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
