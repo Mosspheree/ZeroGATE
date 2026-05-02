@@ -22,7 +22,8 @@ try {
   initializeApp({
     projectId: firebaseConfig.projectId,
   });
-  db = getFirestore();
+  // In Firebase Admin, pass the databaseId if it exists to getFirestore
+  db = getFirestore(firebaseConfig.firestoreDatabaseId || "(default)");
 } catch (error) {
   console.error("Firebase Admin initialization failed:", error);
 }
