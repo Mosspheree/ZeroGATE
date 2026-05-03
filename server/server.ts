@@ -4,81 +4,77 @@ import helmet from "helmet";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import { initializeApp, cert, getApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import fs from "fs";
+import { initializeApp } from "firebase-admin/app";
+import { getFirestore, Firestore } from "firebase-admin/firestore";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Firebase Admin
-// In AI Studio, we can try to use the config file or environment variables
-let db: FirebaseFirestore.Firestore;
+let db: Firestore;
 
 try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-  
   initializeApp({
-    projectId: firebaseConfig.projectId,
+    projectId: process.env.FIREBASE_PROJECT_ID,
   });
-  // In Firebase Admin, pass the databaseId if it exists to getFirestore
-  db = getFirestore(firebaseConfig.firestoreDatabaseId || "(default)");
+  db = getFirestore(process.env.FIREBASE_DATABASE_ID || "(default)");
 } catch (error) {
   console.error("Firebase Admin initialization failed:", error);
 }
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
-  app.use(cors());
+  const allowedOrigin = process.env.APP_URL || `http://localhost:${PORT}`;
+  app.use(cors({ origin: allowedOrigin }));
   app.use(helmet({
-    contentSecurityPolicy: false, // Disable for development to allow Vite
+    contentSecurityPolicy: false,
   }));
-  app.use(express.json());
+  app.use(express.json({ limit: "10kb" }));
 
   // --- API Routes ---
 
-  // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", engine: "ZeroGate Neural v1.0", timestamp: new Date().toISOString() });
   });
 
-  // Risk Evaluation Engine
   app.post("/api/risk/evaluate", (req, res) => {
-    const { ip, ua, email, context } = req.body;
-    
-    // Simple Rule-Based Scorer
-    let score = 95;
-    const flags = [];
+    const { ip, ua, email } = req.body;
 
-    // 1. IP Check (Simulation: certain ranges are 'risky')
+    if (typeof ip !== "string" && ip !== undefined) {
+      res.status(400).json({ error: "Invalid input" });
+      return;
+    }
+
+    let score = 95;
+    const flags: string[] = [];
+
     if (ip && (ip.startsWith("10.") || ip.startsWith("192."))) {
       score -= 5;
       flags.push("INTERNAL_IP_RANGE");
     }
 
-    // 2. User Agent Check (Simulation: legacy browsers are riskier)
     if (ua && (ua.includes("MSIE") || ua.includes("Trident"))) {
       score -= 20;
       flags.push("LEGACY_BROWSER");
     }
 
-    // 3. Time Check (Simulation: late night logins slightly riskier)
     const hour = new Date().getHours();
     if (hour < 5 || hour > 23) {
       score -= 10;
       flags.push("OFF_HOURS_ACCESS");
     }
 
-    // 4. Identity Check
-    if (email && email.endsWith("@mossphere.com")) {
-      score += 5; // Trusted domain
+    const trustedDomain = process.env.TRUSTED_EMAIL_DOMAIN;
+    if (trustedDomain && email && typeof email === "string" && email.endsWith(`@${trustedDomain}`)) {
+      score += 5;
     }
 
     const finalScore = Math.min(100, Math.max(0, score));
-    
+
     let riskLevel = "LOW";
     if (finalScore < 80) riskLevel = "MEDIUM";
     if (finalScore < 50) riskLevel = "HIGH";
@@ -92,10 +88,7 @@ async function startServer() {
     });
   });
 
-  // Telemetry Collector for Recharts
   app.get("/api/telemetry", async (req, res) => {
-    // Client now fetches from Firestore directly to avoid permission issues
-    // Returning empty array as fallback for legacy calls
     res.json([]);
   });
 

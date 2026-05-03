@@ -22,7 +22,7 @@ export function useZeroGate() {
   useEffect(() => {
     if (isLoading) return;
 
-    const isAdmin = currentUser?.email === "mossphere5@gmail.com";
+    const isAdmin = currentUser?.email === import.meta.env.VITE_ADMIN_EMAIL;
     
     const unsubSessions = ZeroGateSDK.subscribeToSessions(
       (data) => setSessions(data),
