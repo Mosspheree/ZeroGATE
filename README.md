@@ -1,85 +1,131 @@
-# ZeroGate: Autonomous Security Orchestration
+# ZeroGate: Adaptive Identity & Security Dashboard
 
-[![Security: CA Authenticated](https://img.shields.io/badge/Security-Continuous_Adaptive_Auth-red)](https://en.wikipedia.org/wiki/Adaptive_authentication)
-[![Runtime: Node 22](https://img.shields.io/badge/Runtime-Node_22-green)](https://nodejs.org/)
 [![Auth: Firebase OIDC](https://img.shields.io/badge/Auth-Firebase_OIDC-orange)](https://firebase.google.com/)
+[![Runtime: Node 22](https://img.shields.io/badge/Runtime-Node_22-green)](https://nodejs.org/)
+[![Frontend: React](https://img.shields.io/badge/Frontend-React_19-blue)](https://react.dev/)
 
-**ZeroGate** is a production-grade Security Services Edge (SSE) demonstration platform. It implements **Continuous Adaptive Authentication (CAA)** to move beyond the "static login" paradigm, instead evaluating session risk in millisecond intervals based on behavioral telemetry and machine-learned heuristics.
+**ZeroGate** is a full-stack prototype of an adaptive identity security system inspired by zero-trust architectures.
+It demonstrates how modern authentication, session tracking, and risk-based access decisions can be combined into a real-time security dashboard.
 
----
-
-## Core Security Architecture
-
-ZeroGate operates on a **Split-Plane Architecture** (ADR-002), physically separating the Identity Management layer from the Risk Intelligence engine.
-
-### 1. The Identity Plane (Control Plane)
-Leverages **Firebase Identity Platform** for high-entropy authentication.
-- **Provider:** Google OIDC 2.1
-- **Session Fabric:** Cryptographically signed JWTs with forced email verification.
-- **Ruleset:** Hardened Attribute-Based Access Control (ABAC) via Firestore Security Rules.
-
-### 2. The Risk Engine (Intelligence Plane)
-A high-concurrency Node.js engine (`/server/server.ts`) that calculates a dynamic **Neural Trust Score (NTS)**.
-- **Signal Analysis:**
-  - `GEO_VELOCITY`: Detects impossible travel patterns between consecutive logins.
-  - `CLIENT_FINGERPRINT`: Validates consistency in browser/OS telemetry.
-  - `REPUTATION_MESH`: Cross-references IP ranges against internal risk databases.
-  - `BEHAVIORAL_TIMING`: Identifies anomalous access windows (e.g., system-level access at 03:00 AM).
-
-### 3. Real-Time SOC Dashboard (Observation Plane)
-A React 19 interface providing global visibility into the identity mesh.
-- **Live Topology:** Dynamic SVG representation of all active authenticated nodes.
-- **Telemetry Stream:** Real-time throughput monitoring using Recharts.
-- **Kill-Switch Orchestration:** Distributed session revocation with <200ms global propagation.
+>  Note: Authentication and session management are implemented using Firebase.
+> Risk scoring, telemetry streams, and incident events are simulated to demonstrate system design concepts.
 
 ---
 
-## Technical Specifications
+## System Overview
 
-### Project Structure
-```text
+ZeroGate explores a zero-trust identity model where authentication is not treated as a one-time event, but as a continuously evaluated session state.
+
+The system is split into three main layers:
+
+---
+
+## 1. Identity Layer (Auth Plane)
+
+Built using Firebase Authentication (OIDC-based flow).
+
+* Google OAuth / Email login support
+* Secure JWT-based session handling
+* Firestore-based access rules (ABAC-style permissions)
+* Protected routes enforced via authentication context
+
+This layer handles all real user identity and session persistence.
+
+---
+
+## 2. Risk Simulation Engine (Backend Layer)
+
+A Node.js service (`/server/server.ts`) simulates a risk evaluation pipeline.
+
+It generates a dynamic risk score based on behavioral signals:
+
+* GEO_VELOCITY → Detects unrealistic location changes
+* CLIENT_FINGERPRINT → Simulated device consistency checks
+* REPUTATION_CHECK → Mock IP reputation lookup
+* BEHAVIORAL_PATTERNS → Simulated access timing anomalies
+
+This module demonstrates how a real risk engine could integrate into an identity system.
+
+---
+
+## 3. Security Dashboard (Frontend Layer)
+
+A React-based SOC-style interface that visualizes system state in real time.
+
+Features:
+
+* Active session monitoring dashboard
+* Simulated global identity map
+* Event stream visualization
+* Session revocation UI (mocked behavior)
+
+---
+
+## Architecture
+
+```
 ZeroGate/
-├── client/           # Identity Portal & SOC Dashboard (React 19)
-│   ├── src/          # Functional core: Hooks, Services, Components
-│   └── index.html    # Entry point
-├── server/           # Risk Intelligence & Backend For Frontend (BFF)
-│   └── server.ts     # Express server & Risk Heuristics
-├── firestore.rules   # Hardened security policies
-├── tsconfig.json     # Strict-mode TypeScript configuration
-└── vite.config.ts    # Advanced build pipeline
+├── client/        # React dashboard UI
+├── server/        # Node.js simulation API
+├── firestore.rules
+├── vite.config.ts
+└── tsconfig.json
 ```
 
-### Security Posture (CAA Implementation)
-- **Credential Safety:** All sensitive configurations (`firebase-applet-config.json`, `.env`) are strictly excluded from version control via `.gitignore`.
-- **DDoS Mitigation:** Integrated `helmet` and `cors` policies with customized CSP (Content Security Policy) headers.
-- **Zero-Trust Logic:** No implicit trust. Every telemetry request (`/api/telemetry`) is independently verified against the Auth context.
+---
+
+## Security & Design Notes
+
+* Firebase Authentication handles real user login and session management
+* Sensitive keys and environment files are excluded via `.gitignore`
+* Express middleware includes standard security headers (helmet, cors)
+* Risk scoring and telemetry are simulation-based for demonstration
 
 ---
 
-## Deployment & Operations
+## Getting Started
 
-### Local Development
+### Install dependencies
+
 ```bash
-# Install dependencies
 npm install
+```
 
-# Start the unified dev server (Express + Vite)
+### Run development environment
+
+```bash
 npm run dev
 ```
 
-### Production Build
+### Build for production
+
 ```bash
-# Generate optimized static assets and server-side ready code
 npm run build
 ```
 
 ---
 
-## Architecture Decision Records (ADRs)
+## Project Intent
 
-- **[ADR-001: Firebase Identity](./docs/ADR-001-why-firebase.md)** - Selection of Google Cloud for enterprise-grade auth.
-- **[ADR-002: Plane Separation](./docs/ADR-002-repo-restructure.md)** - Reasoning for the physical decoupling of Risk vs Auth.
-- **[ADR-003: Technical Vision](./docs/ADR-003-design-philosophy.md)** - Establishing the high-density "SOC-first" visual language.
+This project demonstrates:
+
+* Understanding of modern authentication systems (OIDC, JWT, Firebase)
+* System design for zero-trust architectures
+* Separation of identity, risk, and observability layers
+* Full-stack integration in a security-focused application
 
 ---
-*ZeroGate — Securing the Identity Perimeter.*
+
+## Architecture Decisions
+
+* ADR-001: Firebase chosen for rapid authentication
+* ADR-002: Separation of identity and risk logic for modular design
+* ADR-003: Dashboard-first design for observability visualization
+
+---
+
+## Summary
+
+ZeroGate is a full-stack prototype exploring adaptive authentication and real-time identity monitoring systems.
+
+---
