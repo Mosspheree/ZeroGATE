@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   AreaChart, 
   Area, 
@@ -17,11 +17,11 @@ import {
   Bar,
   Cell
 } from 'recharts';
-import { 
-  Activity, 
-  Users, 
-  ShieldAlert, 
-  Globe, 
+import {
+  Activity,
+  Users,
+  ShieldAlert,
+  Globe,
   ChevronRight,
   Zap,
   Terminal,
@@ -30,7 +30,10 @@ import {
   Lock,
   ArrowUpRight,
   Database,
-  Map as MapIcon
+  Map as MapIcon,
+  X,
+  CheckCircle2,
+  Shield
 } from 'lucide-react';
 import { Session, TelemetryPoint, RiskLevel } from '../types';
 
@@ -102,13 +105,134 @@ const GlobalMap = () => (
   </div>
 );
 
+const POLICY_TEMPLATES = [
+  { id: 'zero-trust', label: 'Zero Trust Baseline', desc: 'Enforce MFA + device trust on all sessions' },
+  { id: 'geo-fence', label: 'Geo-Fence Lockdown', desc: 'Restrict access to approved regions only' },
+  { id: 'step-up', label: 'Step-Up Auth Trigger', desc: 'Re-challenge sessions with trust score < 60' },
+  { id: 'session-ttl', label: 'Session TTL Reduction', desc: 'Expire idle sessions after 15 minutes' },
+];
+
+const ENFORCEMENT_MODES = ['Audit', 'Warn', 'Enforce'];
+
+const PolicyModal = ({ onClose }: { onClose: () => void }) => {
+  const [selected, setSelected] = useState(POLICY_TEMPLATES[0].id);
+  const [mode, setMode] = useState('Enforce');
+  const [deployed, setDeployed] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleDeploy = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setDeployed(true);
+    }, 1800);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 10 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+        className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-brand-indigo/10 flex items-center justify-center text-brand-indigo">
+              <Shield size={16} />
+            </div>
+            <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-white">Deploy New Policy</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {!deployed ? (
+            <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-6 space-y-6">
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Policy Template</p>
+                <div className="space-y-2">
+                  {POLICY_TEMPLATES.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelected(t.id)}
+                      className={`w-full text-left p-4 rounded-2xl border transition-all ${selected === t.id ? 'border-brand-indigo/50 bg-brand-indigo/10' : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'}`}
+                    >
+                      <p className={`text-xs font-bold mb-0.5 ${selected === t.id ? 'text-brand-indigo' : 'text-white'}`}>{t.label}</p>
+                      <p className="text-[10px] text-slate-500 font-light">{t.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Enforcement Mode</p>
+                <div className="flex gap-2">
+                  {ENFORCEMENT_MODES.map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setMode(m)}
+                      className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${mode === m ? 'bg-brand-indigo text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={handleDeploy}
+                disabled={loading}
+                className="w-full py-4 bg-brand-indigo text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-brand-indigo/80 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Propagating to Nodes...
+                  </>
+                ) : 'Deploy to All Nodes'}
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-10 flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-3xl bg-green-500/10 flex items-center justify-center text-green-500">
+                <CheckCircle2 size={32} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-green-500 mb-1">Policy Active</p>
+                <p className="text-xl font-light text-white">{POLICY_TEMPLATES.find(t => t.id === selected)?.label}</p>
+                <p className="text-xs text-slate-500 mt-1">Mode: {mode} · Propagated to 4 nodes</p>
+              </div>
+              <button onClick={onClose} className="mt-4 px-8 py-3 bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-colors">
+                Close
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ sessions, telemetry, onRevoke }) => {
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
   const activeSessions = sessions.filter(s => s.status === 'ACTIVE').length;
   const criticalThreats = sessions.filter(s => s.riskLevel === RiskLevel.CRITICAL).length;
   const avgTrust = Math.round(sessions.reduce((acc, s) => acc + s.trustScore, 0) / sessions.length) || 0;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      <AnimatePresence>{showPolicyModal && <PolicyModal onClose={() => setShowPolicyModal(false)} />}</AnimatePresence>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Active Sessions" value={activeSessions} icon={Users} trend="up" trendValue="+12%" color="indigo" />
         <StatCard title="Neural Trust Index" value={`${avgTrust}%`} icon={Activity} trend="up" trendValue="Verified" color="indigo" />
@@ -212,7 +336,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ sessions, telemetry, onRev
                <Fingerprint size={12} /> Neural Enforcement
             </h3>
             <p className="text-xl font-light text-white mb-6 tracking-tight">CAEP Real-Time Revocation Protocol Active</p>
-            <button className="w-full mt-6 py-4 bg-brand-indigo text-white rounded-xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-brand-indigo/80 transition-colors">
+            <button
+              onClick={() => setShowPolicyModal(true)}
+              className="w-full mt-6 py-4 bg-brand-indigo text-white rounded-xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-brand-indigo/80 transition-colors"
+            >
                Deploy New Policy
             </button>
           </div>
