@@ -8,7 +8,7 @@
 
 ---
 
-## 🛡️ Core Security Architecture
+## Core Security Architecture
 
 ZeroGate operates on a **Split-Plane Architecture** (ADR-002), physically separating the Identity Management layer from the Risk Intelligence engine.
 
@@ -34,7 +34,7 @@ A React 19 interface providing global visibility into the identity mesh.
 
 ---
 
-## 🏗️ Technical Specifications
+## Technical Specifications
 
 ### Project Structure
 ```text
@@ -56,7 +56,7 @@ ZeroGate/
 
 ---
 
-## 🚀 Deployment & Operations
+## Deployment & Operations
 
 ### Local Development
 ```bash
@@ -75,7 +75,7 @@ npm run build
 
 ---
 
-## 📜 Architecture Decision Records (ADRs)
+## Architecture Decision Records (ADRs)
 
 - **[ADR-001: Firebase Identity](./docs/ADR-001-why-firebase.md)** - Selection of Google Cloud for enterprise-grade auth.
 - **[ADR-002: Plane Separation](./docs/ADR-002-repo-restructure.md)** - Reasoning for the physical decoupling of Risk vs Auth.
