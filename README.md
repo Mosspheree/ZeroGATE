@@ -1,131 +1,117 @@
-# ZeroGate: Adaptive Identity & Security Dashboard
+# ZeroGate
 
 [![Auth: Firebase OIDC](https://img.shields.io/badge/Auth-Firebase_OIDC-orange)](https://firebase.google.com/)
 [![Runtime: Node 22](https://img.shields.io/badge/Runtime-Node_22-green)](https://nodejs.org/)
-[![Frontend: React](https://img.shields.io/badge/Frontend-React_19-blue)](https://react.dev/)
+[![Deploy: Vercel](https://img.shields.io/badge/Deploy-Vercel-black)](https://vercel.com/)
 
-**ZeroGate** is a full-stack prototype of an adaptive identity security system inspired by zero-trust architectures.
-It demonstrates how modern authentication, session tracking, and risk-based access decisions can be combined into a real-time security dashboard.
-
->  Note: Authentication and session management are implemented using Firebase.
-> Risk scoring, telemetry streams, and incident events are simulated to demonstrate system design concepts.
-
----
-
-## System Overview
-
-ZeroGate explores a zero-trust identity model where authentication is not treated as a one-time event, but as a continuously evaluated session state.
-
-The system is split into three main layers:
-
----
-
-## 1. Identity Layer (Auth Plane)
-
-Built using Firebase Authentication (OIDC-based flow).
-
-* Google OAuth / Email login support
-* Secure JWT-based session handling
-* Firestore-based access rules (ABAC-style permissions)
-* Protected routes enforced via authentication context
-
-This layer handles all real user identity and session persistence.
-
----
-
-## 2. Risk Simulation Engine (Backend Layer)
-
-A Node.js service (`/server/server.ts`) simulates a risk evaluation pipeline.
-
-It generates a dynamic risk score based on behavioral signals:
-
-* GEO_VELOCITY → Detects unrealistic location changes
-* CLIENT_FINGERPRINT → Simulated device consistency checks
-* REPUTATION_CHECK → Mock IP reputation lookup
-* BEHAVIORAL_PATTERNS → Simulated access timing anomalies
-
-This module demonstrates how a real risk engine could integrate into an identity system.
-
----
-
-## 3. Security Dashboard (Frontend Layer)
-
-A React-based SOC-style interface that visualizes system state in real time.
-
-Features:
-
-* Active session monitoring dashboard
-* Simulated global identity map
-* Event stream visualization
-* Session revocation UI (mocked behavior)
+A full-stack security dashboard implementing **Continuous Adaptive Authentication (CAA)**. Users authenticate via Google (Firebase), sessions are persisted in Firestore, and every login is evaluated by a server-side rule-based risk engine that can step up or revoke sessions in real time.
 
 ---
 
 ## Architecture
 
 ```
-ZeroGate/
-├── client/        # React dashboard UI
-├── server/        # Node.js simulation API
-├── firestore.rules
-├── vite.config.ts
-└── tsconfig.json
+client/           React 19 + Vite — identity portal & SOC dashboard
+  src/
+    components/   Dashboard, charts, modals
+    lib/          Firebase client, device fingerprinting
+    services/     ZeroGate SDK — Firestore reads/writes, risk API calls
+    useZeroGate   React hook — session + event subscriptions
+server/           Express dev server (local only)
+api/              Vercel serverless functions (production)
+  risk/evaluate   Rule-based risk engine
+```
+
+### Data Flow
+
+```
+Browser → Google OAuth → Firebase Auth
+       → /api/risk/evaluate (server resolves real IP)
+       → risk score + enforcement action returned
+       → session written to Firestore (or blocked)
+       → event written to Firestore events collection
+       → dashboard subscribes via Firestore onSnapshot
 ```
 
 ---
 
-## Security & Design Notes
+## Authentication
 
-* Firebase Authentication handles real user login and session management
-* Sensitive keys and environment files are excluded via `.gitignore`
-* Express middleware includes standard security headers (helmet, cors)
-* Risk scoring and telemetry are simulation-based for demonstration
+Firebase Authentication with Google OIDC. Sessions are stored in the `sessions` Firestore collection with:
+
+- `userId`, `email`, `user` — identity
+- `loginTimestamp`, `lastSeen` — timing
+- `ip` — resolved server-side by the risk API
+- `deviceFingerprint` — hash of UA, screen resolution, timezone, language
+- `trustScore`, `riskLevel`, `status` — risk state
 
 ---
 
-## Getting Started
+## Risk Engine
 
-### Install dependencies
+All risk computation runs server-side at `api/risk/evaluate.ts`. The client never computes or overrides risk values.
+
+**Signals evaluated per login:**
+
+| Signal | Score Impact |
+|---|---|
+| Legacy / headless browser | −25 to −40 |
+| Off-hours access (00:00–05:00 UTC) | −10 |
+| Internal / private IP range | −5 |
+| High login frequency (> 5 sessions) | −20 |
+| Device fingerprint mismatch | −30 |
+| IP change from last session | −15 |
+| Trusted email domain | +5 |
+
+**Enforcement (server-decided):**
+
+- `trustScore < 40` → `STEP_UP` — session created as `STEP_UP_PENDING`, access restricted
+- `trustScore < 20` → `REVOKE` — session blocked before creation, event logged
+
+---
+
+## Real-Time Events
+
+Every login, step-up, and revocation writes an event to the `events` Firestore collection. The SOC dashboard subscribes to this collection via `onSnapshot` — no polling, no mock data.
+
+The telemetry chart aggregates events into 5-minute buckets to show login volume and risk intercepts over time.
+
+---
+
+## Local Development
 
 ```bash
 npm install
-```
-
-### Run development environment
-
-```bash
-npm run dev
-```
-
-### Build for production
-
-```bash
-npm run build
+cp .env.example .env   # fill in your Firebase credentials
+npm run dev            # starts Express + Vite on http://localhost:3000
 ```
 
 ---
 
-## Project Intent
+## Environment Variables
 
-This project demonstrates:
+See `.env.example` for the full list. Required variables:
 
-* Understanding of modern authentication systems (OIDC, JWT, Firebase)
-* System design for zero-trust architectures
-* Separation of identity, risk, and observability layers
-* Full-stack integration in a security-focused application
-
----
-
-## Architecture Decisions
-
-* ADR-001: Firebase chosen for rapid authentication
-* ADR-002: Separation of identity and risk logic for modular design
-* ADR-003: Dashboard-first design for observability visualization
+| Variable | Where |
+|---|---|
+| `VITE_FIREBASE_*` | Firebase Console → Project Settings → Your Apps |
+| `VITE_ADMIN_EMAIL` | Email address that gets admin dashboard access |
+| `FIREBASE_PROJECT_ID` | Firebase project ID (server-side) |
+| `TRUSTED_EMAIL_DOMAIN` | Optional — email domain that receives a trust boost |
 
 ---
 
-## Summary
+## Deployment
 
-ZeroGate is a full-stack prototype exploring adaptive authentication and real-time identity monitoring systems.
+Deployed on Vercel as a static Vite build with serverless API functions under `api/`. Push to `main` triggers an automatic production deploy.
+
+**After deploying a new domain, add it to Firebase Console → Authentication → Settings → Authorized domains.**
 
 ---
+
+## Firestore Collections
+
+| Collection | Purpose |
+|---|---|
+| `sessions` | One document per login session |
+| `events` | Append-only event log (login, revoke, step-up) |

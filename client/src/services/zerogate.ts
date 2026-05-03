@@ -1,83 +1,136 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDocs, 
-  query, 
-  where, 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDocs,
+  query,
+  where,
   onSnapshot,
   updateDoc,
-  Timestamp,
-  serverTimestamp
+  orderBy,
+  limit,
+  addDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { Session, RiskLevel, TelemetryPoint } from '../types';
+import { Session, RiskLevel, TelemetryPoint, TelemetryEvent, RiskAction } from '../types';
+import { getDeviceFingerprint } from '../lib/fingerprint';
 
 enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
-  DELETE = 'delete',
   LIST = 'list',
-  GET = 'get',
   WRITE = 'write',
 }
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: any;
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  console.error('Firestore Error:', {
+    error: error instanceof Error ? error.message : String(error),
+    operationType,
+    path,
+    userId: auth.currentUser?.uid,
+  });
+  throw new Error(error instanceof Error ? error.message : String(error));
 }
 
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+async function writeEvent(event: Omit<TelemetryEvent, 'id'>) {
+  try {
+    await addDoc(collection(db, 'events'), {
+      ...event,
+      createdAt: serverTimestamp(),
+    });
+  } catch {
+    // Events are best-effort — do not crash the auth flow
+  }
 }
 
 export class ZeroGateSDK {
-  static async evaluateRisk(userData: { email: string; ua: string }) {
-    try {
-      const response = await fetch('/api/risk/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...userData,
-          ip: 'detected-by-backend', // Node.js req.ip will handle it
-          timestamp: new Date().toISOString()
-        })
-      });
-      return await response.json();
-    } catch (error) {
-      console.error("Risk evaluation failed:", error);
-      return { trustScore: 90, riskLevel: RiskLevel.LOW, flags: [] }; // Safe fallback
-    }
+  static async evaluateRisk(payload: {
+    email: string;
+    ua: string;
+    sessionCount: number;
+    deviceFingerprint: string;
+    previousDeviceFingerprint?: string;
+    lastIp?: string;
+  }) {
+    const response = await fetch('/api/risk/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error('Risk evaluation request failed');
+    return response.json() as Promise<{
+      trustScore: number;
+      riskLevel: string;
+      flags: string[];
+      action: RiskAction;
+      resolvedIp: string;
+      timestamp: string;
+    }>;
   }
 
   static async registerSession(userId: string, email: string, displayName: string) {
-    const riskData = await this.evaluateRisk({ email, ua: navigator.userAgent });
-    
+    // Gather previous session context for cross-session signals
+    let sessionCount = 0;
+    let previousDeviceFingerprint: string | undefined;
+    let lastIp: string | undefined;
+
+    try {
+      const prevSnap = await getDocs(
+        query(collection(db, 'sessions'), where('userId', '==', userId))
+      );
+      sessionCount = prevSnap.size;
+      if (!prevSnap.empty) {
+        const sorted = prevSnap.docs
+          .map(d => d.data() as Session)
+          .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
+        previousDeviceFingerprint = sorted[0]?.deviceFingerprint;
+        lastIp = sorted[0]?.ip;
+      }
+    } catch {
+      // Non-fatal — proceed with what we have
+    }
+
+    const deviceFingerprint = getDeviceFingerprint();
+    const riskData = await this.evaluateRisk({
+      email,
+      ua: navigator.userAgent,
+      sessionCount,
+      deviceFingerprint,
+      previousDeviceFingerprint,
+      lastIp,
+    });
+
+    // Enforcement: server decided this session should be revoked
+    if (riskData.action === 'REVOKE') {
+      await writeEvent({
+        time: riskData.timestamp,
+        type: 'REVOKE',
+        userId,
+        sessionId: 'pre-session',
+        details: `CRIT: Session blocked — ${riskData.flags.join(', ') || 'risk threshold exceeded'}`,
+        riskLevel: RiskLevel.CRITICAL,
+        trustScore: riskData.trustScore,
+      });
+      throw new Error('SESSION_REVOKED_BY_RISK_ENGINE');
+    }
+
     const sessionId = `sess_${Math.random().toString(36).substring(2, 11)}`;
+    const now = new Date().toISOString();
     const sessionData: Session = {
       id: sessionId,
       userId,
       user: displayName,
       email,
       source: navigator.userAgent,
-      ip: 'detected',
+      ip: riskData.resolvedIp,
       trustScore: riskData.trustScore,
       riskLevel: riskData.riskLevel as RiskLevel,
-      status: riskData.trustScore < 40 ? 'STEP_UP_PENDING' : 'ACTIVE',
-      lastSeen: new Date().toISOString()
+      status: riskData.action === 'STEP_UP' ? 'STEP_UP_PENDING' : 'ACTIVE',
+      lastSeen: now,
+      loginTimestamp: now,
+      deviceFingerprint,
     };
 
     try {
@@ -85,10 +138,27 @@ export class ZeroGateSDK {
         ...sessionData,
         createdAt: serverTimestamp(),
       });
-      return sessionData;
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `sessions/${sessionId}`);
     }
+
+    const eventType = riskData.action === 'STEP_UP' ? 'STEP_UP' : 'LOGIN';
+    const eventDetails =
+      riskData.action === 'STEP_UP'
+        ? `WARN: Step-up required — ${riskData.flags.join(', ')}`
+        : `INFO: Login verified — trust ${riskData.trustScore}%`;
+
+    await writeEvent({
+      time: now,
+      type: eventType,
+      userId,
+      sessionId,
+      details: eventDetails,
+      riskLevel: riskData.riskLevel as RiskLevel,
+      trustScore: riskData.trustScore,
+    });
+
+    return sessionData;
   }
 
   static subscribeToSessions(callback: (sessions: Session[]) => void, userId?: string, isAdmin?: boolean) {
@@ -98,56 +168,80 @@ export class ZeroGateSDK {
     } else if (userId) {
       q = query(collection(db, 'sessions'), where('userId', '==', userId));
     } else {
-      // Fallback empty listener
       callback([]);
       return () => {};
     }
 
     return onSnapshot(q, (snapshot) => {
-      const sessions = snapshot.docs.map(doc => doc.data() as Session);
-      callback(sessions);
+      callback(snapshot.docs.map(d => d.data() as Session));
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'sessions');
     });
   }
 
   static async revokeSession(sessionId: string) {
+    const now = new Date().toISOString();
     try {
       await updateDoc(doc(db, 'sessions', sessionId), {
         status: 'REVOKED',
         trustScore: 0,
         riskLevel: RiskLevel.CRITICAL,
-        lastSeen: new Date().toISOString()
+        lastSeen: now,
       });
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `sessions/${sessionId}`);
+      handleFirestoreError(error, OperationType.UPDATE, `sessions/${sessionId}`);
     }
+
+    const userId = auth.currentUser?.uid ?? 'unknown';
+    await writeEvent({
+      time: now,
+      type: 'REVOKE',
+      userId,
+      sessionId,
+      details: 'CRIT: Forced session revocation via control plane',
+      riskLevel: RiskLevel.CRITICAL,
+      trustScore: 0,
+    });
   }
 
-  static async getTelemetry(): Promise<TelemetryPoint[]> {
-    try {
-      const q = query(
-        collection(db, 'telemetry'),
-        where('timestamp', '!=', ''), // Dummy where to allow orderBy if needed, or just orderBy
-      );
-      // Note: orderBy without where on a different field might fail indices, but single field is fine
-      const snapshot = await getDocs(query(collection(db, 'telemetry')));
-      const data = snapshot.docs.map(doc => doc.data() as TelemetryPoint);
-      
-      if (data.length > 0) {
-        return data.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-      }
-    } catch (error) {
-      console.warn("Firestore telemetry fetch failed, falling back to mock data:", error);
-    }
-    
-    // Mock Data Generator for polished UI
-    const now = new Date();
-    return Array.from({ length: 20 }).map((_, i) => ({
-      time: new Date(now.getTime() - (20 - i) * 60000).toISOString(),
-      requests: Math.floor(Math.random() * 50) + 10,
-      avgLatency: Math.floor(Math.random() * 20) + 30,
-      riskEvents: Math.floor(Math.random() * 5)
-    }));
+  static subscribeToEvents(callback: (events: TelemetryEvent[]) => void) {
+    const q = query(
+      collection(db, 'events'),
+      orderBy('time', 'desc'),
+      limit(100)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const events = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+      })) as TelemetryEvent[];
+      callback(events);
+    }, () => {
+      callback([]);
+    });
+  }
+
+  static computeTelemetry(events: TelemetryEvent[]): TelemetryPoint[] {
+    const bucketMs = 5 * 60 * 1000;
+    const bucketCount = 20;
+    const now = Date.now();
+
+    return Array.from({ length: bucketCount }).map((_, i) => {
+      const bucketEnd = now - (bucketCount - 1 - i) * bucketMs;
+      const bucketStart = bucketEnd - bucketMs;
+
+      const inBucket = events.filter(e => {
+        const t = new Date(e.time).getTime();
+        return t >= bucketStart && t < bucketEnd;
+      });
+
+      return {
+        time: new Date(bucketEnd).toISOString(),
+        requests: inBucket.filter(e => e.type === 'LOGIN').length,
+        avgLatency: 38,
+        riskEvents: inBucket.filter(e => e.type === 'REVOKE' || e.type === 'STEP_UP').length,
+      };
+    });
   }
 }

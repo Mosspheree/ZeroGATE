@@ -10,6 +10,8 @@ export enum RiskLevel {
   CRITICAL = 'CRITICAL'
 }
 
+export type RiskAction = 'STEP_UP' | 'REVOKE' | null;
+
 export interface Session {
   id: string;
   userId: string;
@@ -20,6 +22,8 @@ export interface Session {
   trustScore: number;
   status: 'ACTIVE' | 'REVOKED' | 'STEP_UP_PENDING';
   lastSeen: string;
+  loginTimestamp: string;
+  deviceFingerprint: string;
   riskLevel: RiskLevel;
 }
 
@@ -28,4 +32,15 @@ export interface TelemetryPoint {
   requests: number;
   avgLatency: number;
   riskEvents: number;
+}
+
+export interface TelemetryEvent {
+  id?: string;
+  time: string;
+  type: 'LOGIN' | 'REVOKE' | 'STEP_UP' | 'RISK_UPDATE';
+  userId: string;
+  sessionId: string;
+  details: string;
+  riskLevel: RiskLevel;
+  trustScore: number;
 }

@@ -35,11 +35,12 @@ import {
   CheckCircle2,
   Shield
 } from 'lucide-react';
-import { Session, TelemetryPoint, RiskLevel } from '../types';
+import { Session, TelemetryPoint, TelemetryEvent, RiskLevel } from '../types';
 
 interface DashboardProps {
   sessions: Session[];
   telemetry: TelemetryPoint[];
+  events: TelemetryEvent[];
   onRevoke: (id: string) => void;
 }
 
@@ -224,7 +225,7 @@ const PolicyModal = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ sessions, telemetry, onRevoke }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ sessions, telemetry, events, onRevoke }) => {
   const [showPolicyModal, setShowPolicyModal] = useState(false);
   const activeSessions = sessions.filter(s => s.status === 'ACTIVE').length;
   const criticalThreats = sessions.filter(s => s.riskLevel === RiskLevel.CRITICAL).length;
@@ -347,16 +348,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ sessions, telemetry, onRev
           <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-3xl p-8">
             <h3 className="text-[11px] uppercase tracking-[0.4em] font-black text-slate-500 mb-6">Incident Log</h3>
             <div className="space-y-4 font-mono text-[10px]">
-               {[
-                 { t: "12:44:21", m: "WARN: Impossible travel HKG -> SFO", s: "rose" },
-                 { t: "12:42:04", m: "INFO: DPoP proof verified", s: "indigo" },
-                 { t: "12:38:12", m: "CRIT: Forced revocation", s: "rose" },
-               ].map((log, i) => (
-                 <div key={i} className="flex gap-4">
-                    <span className="text-slate-600">{log.t}</span>
-                    <span className={`text-brand-${log.s} opacity-80 uppercase`}>{log.m}</span>
-                 </div>
-               ))}
+              {events.length === 0 ? (
+                <p className="text-slate-600 italic">No events recorded.</p>
+              ) : events.slice(0, 5).map((event) => (
+                <div key={event.id} className="flex gap-4">
+                  <span className="text-slate-600 shrink-0">
+                    {new Date(event.time).toLocaleTimeString('en-US', { hour12: false })}
+                  </span>
+                  <span className={`opacity-80 uppercase ${event.type === 'REVOKE' || event.type === 'STEP_UP' ? 'text-brand-rose' : 'text-brand-indigo'}`}>
+                    {event.details}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

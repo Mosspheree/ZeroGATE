@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Session, TelemetryPoint } from './types';
+import { Session, TelemetryPoint, TelemetryEvent } from './types';
 import { ZeroGateSDK } from './services/zerogate';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './lib/firebase';
@@ -7,40 +7,37 @@ import { auth } from './lib/firebase';
 export function useZeroGate() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
+  const [events, setEvents] = useState<TelemetryEvent[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setIsLoading(false);
     });
-
-    return () => unsubAuth();
+    return () => unsub();
   }, []);
 
   useEffect(() => {
     if (isLoading) return;
 
     const isAdmin = currentUser?.email === import.meta.env.VITE_ADMIN_EMAIL;
-    
+
     const unsubSessions = ZeroGateSDK.subscribeToSessions(
-      (data) => setSessions(data),
+      setSessions,
       currentUser?.uid,
       isAdmin
     );
 
-    const fetchTelemetry = async () => {
-      const data = await ZeroGateSDK.getTelemetry();
-      setTelemetry(data);
-    };
-
-    fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 10000);
+    const unsubEvents = ZeroGateSDK.subscribeToEvents((incoming) => {
+      setEvents(incoming);
+      setTelemetry(ZeroGateSDK.computeTelemetry(incoming));
+    });
 
     return () => {
       unsubSessions();
-      clearInterval(interval);
+      unsubEvents();
     };
   }, [currentUser, isLoading]);
 
@@ -61,9 +58,10 @@ export function useZeroGate() {
   return {
     sessions,
     telemetry,
+    events,
     revokeSession,
     createSession,
     currentUser,
-    isLoading
+    isLoading,
   };
 }

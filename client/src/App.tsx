@@ -118,18 +118,30 @@ const AppSimulation = () => {
       }
       
       setAuthState('CHALLENGE');
-      
-      // Artificial delay for the "Evaluation" visual
+
       setTimeout(async () => {
-        if (persona === 'ATTACKER') {
-          setAuthState('DENIED');
-        } else {
-          await createSession();
-          setAuthState('SUCCESS');
+        try {
+          if (persona === 'ATTACKER') {
+            setAuthState('DENIED');
+            return;
+          }
+          const session = await createSession();
+          if (session?.status === 'STEP_UP_PENDING') {
+            setAuthState('DENIED');
+          } else {
+            setAuthState('SUCCESS');
+          }
+        } catch (error: any) {
+          if (error?.message === 'SESSION_REVOKED_BY_RISK_ENGINE') {
+            setAuthState('DENIED');
+          } else {
+            console.error('Auth flow failed:', error);
+            setAuthState('IDLE');
+          }
         }
       }, 2500);
     } catch (error) {
-      console.error("Auth flow failed:", error);
+      console.error('Auth flow failed:', error);
       setAuthState('IDLE');
     }
   };
@@ -297,7 +309,7 @@ const AppSimulation = () => {
 
 export default function App() {
   const [view, setView] = useState<View>(View.LANDING);
-  const { sessions, telemetry, revokeSession } = useZeroGate();
+  const { sessions, telemetry, events, revokeSession } = useZeroGate();
 
   return (
     <div className="min-h-screen bg-[#020617] text-gray-100 selection:bg-brand-indigo selection:text-white selection:bg-opacity-30">
@@ -557,7 +569,7 @@ export default function App() {
                     </div>
                  </div>
               </div>
-              <Dashboard sessions={sessions} telemetry={telemetry} onRevoke={revokeSession} />
+              <Dashboard sessions={sessions} telemetry={telemetry} events={events} onRevoke={revokeSession} />
             </motion.div>
           )}
 
