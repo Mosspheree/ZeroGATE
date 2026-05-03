@@ -126,7 +126,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ sessions, telemetry, onRev
               </div>
             </div>
             <div className="h-[320px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={320}>
                 <AreaChart data={telemetry}>
                   <defs>
                     <linearGradient id="colorReq" x1="0" y1="0" x2="0" y2="1">
